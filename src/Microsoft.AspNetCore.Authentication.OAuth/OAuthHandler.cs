@@ -204,24 +204,48 @@ namespace Microsoft.AspNetCore.Authentication.OAuth
 
         protected virtual string BuildChallengeUrl(AuthenticationProperties properties, string redirectUri)
         {
-            var scope = FormatScope();
+            var queryStrings = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            queryStrings.Add("response_type", "code");
+            queryStrings.Add("client_id", Options.ClientId);
+            queryStrings.Add("redirect_uri", redirectUri);
+
+            AddQueryString(queryStrings, properties, "scope", FormatScope());
 
             var state = Options.StateDataFormat.Protect(properties);
-            var parameters = new Dictionary<string, string>
-            {
-                { "client_id", Options.ClientId },
-                { "scope", scope },
-                { "response_type", "code" },
-                { "redirect_uri", redirectUri },
-                { "state", state },
-            };
-            return QueryHelpers.AddQueryString(Options.AuthorizationEndpoint, parameters);
+            queryStrings.Add("state", state);
+
+            return QueryHelpers.AddQueryString(Options.AuthorizationEndpoint, queryStrings);
         }
 
         protected virtual string FormatScope()
         {
             // OAuth2 3.3 space separated
             return string.Join(" ", Options.Scope);
+        }
+
+        private static void AddQueryString(
+            IDictionary<string, string> queryStrings,
+            AuthenticationProperties properties,
+            string name,
+            string defaultValue = null)
+        {
+            string value;
+            if (!properties.Items.TryGetValue(name, out value))
+            {
+                value = defaultValue;
+            }
+            else
+            {
+                // Remove the parameter from AuthenticationProperties so it won't be serialized to state parameter
+                properties.Items.Remove(name);
+            }
+
+            if (value == null)
+            {
+                return;
+            }
+
+            queryStrings[name] = value;
         }
     }
 }
